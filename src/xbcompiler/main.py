@@ -1,6 +1,5 @@
 """Entry-point for XB Compiler application"""
 
-import sys
 import argparse
 
 from loguru import logger
@@ -36,7 +35,7 @@ def run_cli() -> int:
     logger.debug("Writing compiler result to output file..")
     with open(output_path, "wb") as file:
         file.write(result)
-    
+
     return 0
 
     # except FileNotFoundError:
