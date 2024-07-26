@@ -1,21 +1,72 @@
 """Entry-point for XB Compiler application"""
 
 import argparse
+import tarfile
+import gzip
+import io
 
 from loguru import logger
+import magic
 
+from parser.main import parse
+
+logger = logger.opt(colors=True)
 logger.disable("xbcompiler")
+
+
+def uncompress_tarball(file: bytes) -> bytes:
+    """Uncompress gzip-compressed tarball"""
+    logger.debug("Uncompressing gzip-compressed tarball")
+
+    tarball = gzip.decompress(file)
+
+    # [TODO: take only the start of big files]
+    file_type = magic.from_buffer(tarball, mime=True)
+
+    logger.debug("Detected file (mime) type to be <m>{}</>", file_type)
+
+    if file_type != "application/x-tar":
+        raise ValueError(
+            f"Invalid file type (after gzip decompressing): {file_type}"
+        )
+
+    return tarball
 
 
 def main(file: bytes) -> bytes:
     """Compile a given XLA file"""
     logger.debug("Starting the compiling process, given bytes")
 
-    return b"hi"
+    # [TODO: take only the start of big files]
+    file_type = magic.from_buffer(file, mime=True)
+
+    logger.debug("Detected file (mime) type to be <m>{}</>", file_type)
+
+    if file_type == "application/gzip":
+        # tarball = uncompress_tarball(file)
+        io_bytes = io.BytesIO(file)
+        tar = tarfile.open(fileobj=io_bytes, mode="r:gz")
+
+    elif file_type == "application/x-tar":
+        # tarball = file
+        io_bytes = io.BytesIO(file)
+        tar = tarfile.open(fileobj=io_bytes, mode="r")
+
+    else:
+        raise ValueError(f"Invalid file type given: {file_type}")
+
+    logger.trace("Successfully got tar data from XLA")
+
+    files = map(tar.extractfile, tar.getmembers())
+    result = parse([x for x in files if x is not None])
+
+    return bytes(result, encoding="UTF-8")
 
 
 def run_cli() -> int:
     """Run the compiler as CLI app"""
+
+    logger.remove()
 
     parser = argparse.ArgumentParser(
         description="Xilia Base Compiler (XLA => LUA)")
